@@ -9,6 +9,15 @@ HORAS_SEMANA = 15
 PRECIO_HORA = 8.15
 LIMITE_PACTADAS = 0.30   # 30% de las horas contratadas (60% si tu convenio lo amplía)
 ARCHIVO_TURNOS = "horas.txt"
+
+# Horas ordinarias (las del contrato):
+#   True  -> se pagan siempre completas (sueldo fijo mensual), trabajes más o menos
+#   False -> se pagan solo las horas realmente trabajadas, hasta el máximo del contrato
+PAGO_ORDINARIAS_FIJO = True
+
+# Descuentos para el NETO ORIENTATIVO. Cámbialos por los porcentajes de tu nómina.
+SEGURIDAD_SOCIAL = 0.065   # % del bruto (mira tu nómina)
+IRPF = 0.02                # % del bruto (mira tu nómina)
 # -----------------------------
 
 DIAS = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
@@ -76,7 +85,13 @@ def main(mes_txt, archivo=ARCHIVO_TURNOS):
     dias_mes = calendar.monthrange(anio, mes)[1]
     contrato_mes = HORAS_SEMANA * dias_mes / 7
     compl = max(0, total - contrato_mes)
-    importe = compl * PRECIO_HORA
+    ordinarias = contrato_mes if PAGO_ORDINARIAS_FIJO else min(total, contrato_mes)
+    importe_ord = ordinarias * PRECIO_HORA
+    importe_compl = compl * PRECIO_HORA
+    bruto = importe_ord + importe_compl
+    desc_ss = bruto * SEGURIDAD_SOCIAL
+    desc_irpf = bruto * IRPF
+    neto = bruto - desc_ss - desc_irpf
     tope = contrato_mes * LIMITE_PACTADAS
 
     # ---- Tabla 1: detalle de turnos ----
@@ -103,9 +118,15 @@ def main(mes_txt, archivo=ARCHIVO_TURNOS):
     resumen = [
         ["Horas trabajadas", f"{total:.2f} h"],
         ["Horas de contrato (mes)", f"{contrato_mes:.2f} h"],
+        ["Horas ordinarias pagadas", f"{ordinarias:.2f} h"],
         ["Horas complementarias", f"{compl:.2f} h"],
         ["Precio por hora", f"{PRECIO_HORA:.2f} €"],
-        ["Importe bruto estimado", f"{importe:.2f} €"],
+        ["Importe horas ordinarias", f"{importe_ord:.2f} €"],
+        ["Importe complementarias", f"{importe_compl:.2f} €"],
+        ["BRUTO TOTAL", f"{bruto:.2f} €"],
+        [f"Seg. Social ({SEGURIDAD_SOCIAL*100:.2f}%)", f"-{desc_ss:.2f} €"],
+        [f"IRPF ({IRPF*100:.2f}%)", f"-{desc_irpf:.2f} €"],
+        ["NETO ORIENTATIVO", f"{neto:.2f} €"],
     ]
     tabla(["Concepto", "Valor"], resumen, ["<", ">"])
     if compl > tope:
@@ -121,10 +142,18 @@ def main(mes_txt, archivo=ARCHIVO_TURNOS):
             w.writerow([fecha.strftime("%d/%m/%Y"), DIAS[fecha.weekday()], ini, fin, desc,
                         f"{h:.2f}".replace(".", ","), fecha.isocalendar()[1]])
         w.writerow([])
-        w.writerow(["Horas trabajadas", f"{total:.2f}".replace(".", ",")])
-        w.writerow(["Horas contrato mes", f"{contrato_mes:.2f}".replace(".", ",")])
-        w.writerow(["Horas complementarias", f"{compl:.2f}".replace(".", ",")])
-        w.writerow(["Importe bruto (€)", f"{importe:.2f}".replace(".", ",")])
+        def n(x):
+            return f"{x:.2f}".replace(".", ",")
+        w.writerow(["Horas trabajadas", n(total)])
+        w.writerow(["Horas contrato mes", n(contrato_mes)])
+        w.writerow(["Horas ordinarias pagadas", n(ordinarias)])
+        w.writerow(["Horas complementarias", n(compl)])
+        w.writerow(["Importe ordinarias (€)", n(importe_ord)])
+        w.writerow(["Importe complementarias (€)", n(importe_compl)])
+        w.writerow(["Bruto total (€)", n(bruto)])
+        w.writerow(["Seguridad Social (€)", n(-desc_ss)])
+        w.writerow(["IRPF (€)", n(-desc_irpf)])
+        w.writerow(["Neto orientativo (€)", n(neto)])
     print(f"\nTabla guardada en: {salida}")
 
 
